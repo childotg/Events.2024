@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-app
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sample-app
+  template:
+    metadata:
+      labels:
+        app: sample-app
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx:latest
+          ports:
+          - containerPort: 80
+          volumeMounts:
+            - name: html-volume
+              mountPath: /usr/share/nginx/html        
+      volumes:
+        - name: html-volume
+          configMap:
+            name: sample-app-map
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sample-app-map
+  namespace: apps
+data:
+  index.html: |
+   <!doctype html>
+   <html>
+   <head>
+    <title>Hello!</title>    
+   </head>
+   <body>
+   Hello world!
+   </body>
+   </html>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-app-svc
+  namespace: apps
+spec:
+  selector:
+    app: sample-app
+  ports:    
+    - name: app
+      protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sample-app-ingress
+  namespace: apps
+  annotations:    
+    cert-manager.io/cluster-issuer: acme
+    traefik.ingress.kubernetes.io/router.middlewares: ops-redirect-https@kubernetescrd
+spec:
+  ingressClassName: "traefik"
+  rules:
+  - host: "sample-app.demos-aks.cloudmakers.xyz"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: sample-app-svc
+            port:
+              number: 80 
+  tls:
+    - secretName: sample-app-primary-tls
+      hosts:
+        - sample-app.demos-aks.cloudmakers.xyz
