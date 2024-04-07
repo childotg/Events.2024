@@ -1,0 +1,159 @@
+#LibreChat
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: librechat-env
+  namespace: apps
+data:  
+  .env: |
+    
+    #=============================================================#
+    #                   LibreChat Configuration                   #
+    #=============================================================#
+    # Please refer to the reference documentation for assistance  #
+    # with configuring your LibreChat environment. The guide is   #
+    # available both online and within your local LibreChat       #
+    # directory:                                                  #
+    # Online: https://docs.librechat.ai/install/dotenv.html       #
+    # Locally: ./docs/install/dotenv.md                           #
+    #=============================================================#
+
+    #==================================================#
+    #               Server Configuration               #
+    #==================================================#
+
+    APP_TITLE=LibreChat
+    CUSTOM_FOOTER="Enjoy!"
+
+    HOST=0.0.0.0
+    PORT=3080
+
+    MONGO_URI=mongodb+srv://robertofreato:TFQWqlrkABHrRBBh@demos-cluster.6kfkqfu.mongodb.net/librechat01?retryWrites=true
+
+    NO_INDEX=true
+
+    #===================================================#
+    #                     Endpoints                     #
+    #===================================================#
+        
+    ENDPOINTS=azureOpenAI
+
+
+    #============#
+    # Azure      #
+    #============#
+
+    AZURE_API_KEY=6ba2314e9e374acd92d3bfbbefb79dc1
+    AZURE_OPENAI_API_INSTANCE_NAME=retex-demos-oai
+    AZURE_OPENAI_MODELS=gpt-35-turbo-1106
+    AZURE_OPENAI_API_VERSION=2024-02-15-preview
+
+    AZURE_USE_MODEL_AS_DEPLOYMENT_NAME=TRUE
+    PLUGINS_USE_AZURE="true"
+   
+    #============#
+    # Plugins    #
+    #============#
+
+    PLUGIN_MODELS=gpt-3.5-turbo
+
+    DEBUG_PLUGINS=true
+
+    CREDS_KEY=b446001573d76740f29f5938aeb248cdf0c50d90139cd62585161a2769ac46d6
+    CREDS_IV=91c1b86e453ee372bdd5a8b612ac9d84
+
+    #========================#
+    # Registration and Login #
+    #========================#
+
+    ALLOW_EMAIL_LOGIN=true
+    ALLOW_REGISTRATION=false
+    ALLOW_SOCIAL_LOGIN=false
+    ALLOW_SOCIAL_REGISTRATION=false
+
+    SESSION_EXPIRY=1000 * 60 * 15
+    REFRESH_TOKEN_EXPIRY=(1000 * 60 * 60 * 24) * 7
+
+    JWT_SECRET=cfe6e04093e643a4a801ee65d0d2505c1c4ba9d4b72ce196b5906c7271f32b0b
+    JWT_REFRESH_SECRET=5723682a9e48b22331f2810286c62dba000e0286738a2f8545c4525d13dcdc85
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: librechat-api
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: librechat-api
+  template:
+    metadata:
+      labels:
+        app: librechat-api
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                    - amd64      
+      containers:      
+      - name: librechat
+        image: ghcr.io/danny-avila/librechat:v0.6.10
+        command: ["sh", "-c", "cd /app && mkdir meili_data_v1.5 images .env.production .env.development data-node api/logs && chmod -R 777 meili_data_v1.5 images .env.production .env.development data-node api/logs && npm run backend"]
+        ports:
+        - containerPort: 3080
+        volumeMounts:
+        - name: env-file
+          mountPath: /app/.env
+          subPath: .env
+      volumes:
+      - name: env-file
+        configMap:
+          name: librechat-env      
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: librechat-api-svc
+  namespace: apps
+spec:
+  selector:
+    app: librechat-api
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 3080  
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: librechat-ingress  
+  namespace: apps
+  annotations:    
+    cert-manager.io/cluster-issuer: acme
+    traefik.ingress.kubernetes.io/router.middlewares: ops-redirect-https@kubernetescrd
+spec:
+  ingressClassName: "traefik"
+  rules:
+  - host: "librechat.demos-aks.cloudmakers.xyz"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: librechat-api-svc
+            port:
+              number: 80    
+  tls:
+    - secretName: librechat-primary-tls
+      hosts:
+        - librechat.demos-aks.cloudmakers.xyz
