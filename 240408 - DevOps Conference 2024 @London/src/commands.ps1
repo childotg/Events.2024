@@ -22,6 +22,12 @@ az container create --resource-group $RESOURCE_GROUP --name sample-app --image n
             --dns-name-label sample-app --ports 80 --azure-file-volume-account-name $STORAGE_ACCOUNT `
             --azure-file-volume-account-key $STORAGE_KEY --azure-file-volume-share-name $STORAGE_SHARE --azure-file-volume-mount-path /usr/share/nginx/html
 
+#This won't work due to missing subPath
+az container create --resource-group $RESOURCE_GROUP --name librechat --image ghcr.io/danny-avila/librechat:v0.6.10 `
+            --dns-name-label librechat --ports 80 --azure-file-volume-account-name $STORAGE_ACCOUNT `
+            --azure-file-volume-account-key $STORAGE_KEY --azure-file-volume-share-name $STORAGE_SHARE --azure-file-volume-mount-path /app/.env
+
+
 
 # Create the ACA Environment
 az containerapp env create --name $CONTAINERAPPS_ENVIRONMENT --resource-group $RESOURCE_GROUP --location $LOCATION `
