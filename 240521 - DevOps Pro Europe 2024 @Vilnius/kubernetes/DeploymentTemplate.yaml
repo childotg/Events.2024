@@ -1,0 +1,26 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{appName}}
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{appName}}
+  template:    
+    metadata:
+      labels:
+        app: {{appName}}
+    spec:            
+      containers:
+      - name: {{appName}}
+        image: gitopsdemos.azurecr.io/{{appName}}:{{build}}
+        imagePullPolicy: Always       
+        resources:          
+          limits:            
+            cpu: {{cpu}}
+            memory: {{memory}}
+      imagePullSecrets:
+      - name: gitopsdemos-registry
