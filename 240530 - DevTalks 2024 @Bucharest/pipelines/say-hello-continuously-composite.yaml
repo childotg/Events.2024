@@ -1,0 +1,8 @@
+extends:
+  template: pipelineBase.yaml
+  parameters:
+    appName: say-hello-continuously
+    cpu: 0.1
+    memory: 0.1Gi
+
+trigger: none

@@ -1,0 +1,85 @@
+trigger: none
+jobs:
+- job: Job_1
+  displayName: Build and Publish
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  - checkout: self
+    fetchDepth: 0
+    persistCredentials: true
+  - task: DotNetCoreCLI@2
+    displayName: Build the code
+    inputs:
+      command: publish
+      publishWebProjects: false
+      projects: src/say-hello-continuously/say-hello-continuously.csproj
+      arguments: --configuration Release -o $(Build.ArtifactStagingDirectory)
+      zipAfterPublish: false
+      modifyOutputPath: false
+  - task: CmdLine@2
+    displayName: Generate Dockerfile
+    inputs:
+      script: >-
+        echo "FROM mcr.microsoft.com/dotnet/aspnet:8.0" >> ./Dockerfile
+
+        echo "COPY [\"/\",\"App/\"]" >> ./Dockerfile
+
+        echo "WORKDIR /App" >> ./Dockerfile
+
+        echo "ENTRYPOINT [\"dotnet\", \"say-hello-continuously.dll\"]" >> ./Dockerfile
+
+        cat ./Dockerfile
+      workingDirectory: $(Build.ArtifactStagingDirectory)
+  - task: Docker@2
+    displayName: Build Docker Image
+    inputs:
+      containerRegistry: 70d998e6-dee6-4006-9836-f8a12890b778
+      repository: say-hello-continuously
+      Dockerfile: $(Build.ArtifactStagingDirectory)/Dockerfile
+      buildContext: $(Build.ArtifactStagingDirectory)
+      addPipelineData: false
+      addBaseImageData: false
+  - task: CmdLine@2
+    displayName: Generate K8s YAML
+    inputs:
+      script: >-
+        cp $(Build.SourcesDirectory)/kubernetes/say-hello-continuously.yaml $(Build.ArtifactStagingDirectory)/deploy.yaml
+
+        sed -i 's~{{build}}~$(Build.BuildId)~' $(Build.ArtifactStagingDirectory)/deploy.yaml
+      workingDirectory: $(Build.ArtifactStagingDirectory)
+  - task: Kubernetes@1
+    displayName: Publish into K8s
+    inputs:
+      kubernetesServiceEndpoint: f7de753d-d536-42fe-a145-463537ae0f3b
+      command: apply
+      useConfigurationFile: true
+      configuration: $(Build.ArtifactStagingDirectory)/deploy.yaml
+  - task: CmdLine@2
+    displayName: Save YAML in git    
+    inputs:
+      script: >-
+        cd $(Build.SourcesDirectory)
+
+        cp $(Build.ArtifactStagingDirectory)/deploy.yaml ./state/say-hello-continuously.yaml
+
+
+        repoUri=${BUILD_REPOSITORY_URI//https:\/\//}
+
+
+        git config --global user.email "gitops-bot@cloudmakers.xyz"
+
+        git config --global user.name "GitOps Bot"
+
+        git remote set-url origin "https://x-access-token:${SYSTEM_ACCESSTOKEN}@${repoUri}"
+
+
+        git checkout main
+
+        git add .
+
+        git commit -m "gitops: build $(Build.BuildId) for say-hello-continuously.yaml"
+
+        git push origin main
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
