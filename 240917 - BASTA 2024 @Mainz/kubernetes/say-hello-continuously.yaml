@@ -1,0 +1,26 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: say-hello-continuously
+  namespace: apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: say-hello-continuously
+  template:    
+    metadata:
+      labels:
+        app: say-hello-continuously
+    spec:            
+      containers:
+      - name: say-hello-continuously
+        image: gitopsdemos.azurecr.io/say-hello-continuously:{{build}}
+        imagePullPolicy: Always       
+        resources:          
+          limits:            
+            cpu: 0.1
+            memory: 0.2Gi        
+      imagePullSecrets:
+      - name: gitopsdemos-registry
